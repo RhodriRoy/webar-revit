@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>新锐鲁班工匠 · 建筑模型 AR 查看器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+  background:#F4F6F9;color:#0F1419;
+  font-family:'IBM Plex Sans','Noto Sans SC','PingFang SC',sans-serif;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:0.005em;
+}
+::selection{background:#1E5BD6;color:#fff}
+
+/* ====== LANDING ====== */
+#landing{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:#F4F6F9;transition:opacity .45s ease,transform .45s ease;overflow:hidden}
+#landing.hide{opacity:0;transform:scale(1.02);pointer-events:none}
+
+#header{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid #DEE2EA;flex-shrink:0;background:rgba(244,246,249,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+@media(max-width:767px){#header{padding:14px 20px}}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{width:30px;height:30px;flex-shrink:0;border-radius:4px;background:#0F1419;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:500}
+.brand-text{display:flex;flex-direction:column;gap:1px}
+.brand-title{font-size:16px;font-weight:500;color:#0F1419;line-height:1.2;letter-spacing:-0.005em}
+.brand-sub{font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;font-weight:500;color:#5A6373;letter-spacing:0.16em;text-transform:uppercase}
+
+#header-actions{display:flex;align-items:center;gap:10px}
+.btn-ghost{background:transparent;border:1px solid #DEE2EA;color:#2D3543;font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;font-weight:600;padding:7px 14px;cursor:pointer;transition:all 280ms cubic-bezier(.16,1,.3,1)}
+.btn-ghost:hover{border-color:#0F1419;color:#0F1419}
+
+/* Hero */
+#hero{text-align:center;padding:36px 24px 8px;flex-shrink:0;opacity:0;animation:rise .7s ease .15s forwards}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+#hero .section-num{font-family:'IBM Plex Mono','Consolas',monospace;font-size:12px;font-weight:500;color:#1E5BD6;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:6px}
+#hero h1{font-size:clamp(20px,3.2vw,32px);font-weight:600;color:#0F1419;letter-spacing:-0.015em;line-height:1.15}
+#hero h1 .accent{color:#1E5BD6}
+#hero .sub{font-size:clamp(12px,1.1vw,14px);color:#5A6373;margin-top:4px;font-weight:400}
+#hero .rule{width:28px;height:2px;margin:10px auto 0;background:#1E5BD6}
+
+/* Grid */
+#grid-wrap{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 24px 60px;scrollbar-width:thin;scrollbar-color:#DEE2EA transparent;-webkit-overflow-scrolling:touch}
+#grid-wrap::-webkit-scrollbar{width:4px}
+#grid-wrap::-webkit-scrollbar-thumb{background:#DEE2EA;border-radius:2px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;max-width:880px;margin:0 auto}
+
+/* Card */
+.model-card{background:#fff;border:1px solid #DEE2EA;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1);position:relative}
+.model-card:hover{border-color:#1E5BD6;box-shadow:0 4px 20px rgba(30,91,214,0.06)}
+.model-card:focus-visible{outline:2px solid #1E5BD6;outline-offset:2px}
+
+.model-card .visual{position:relative;width:100%;padding-top:54%;background:#FAFBFC;overflow:hidden;border-bottom:1px solid #EDF0F4}
+.model-card .visual .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(30,91,214,0.04)1px,transparent 1px),linear-gradient(90deg,rgba(30,91,214,0.04)1px,transparent 1px);background-size:20px 20px}
+.model-card .visual .badge{position:absolute;top:12px;left:12px;font-family:'IBM Plex Mono','Consolas',monospace;font-size:9px;font-weight:500;color:#8C95A4;letter-spacing:0.12em;text-transform:uppercase}
+.model-card .visual svg.icon{position:absolute;bottom:10px;right:12px;width:48px;height:48px;opacity:0.08;transition:opacity .4s,transform .4s}
+.model-card:hover .visual svg.icon{opacity:0.12;transform:scale(1.04)}
+.model-card .visual .enter{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono','Consolas',monospace;font-size:9px;color:#8C95A4;letter-spacing:0.18em;text-transform:uppercase;opacity:0;transition:opacity .3s}
+.model-card:hover .visual .enter{opacity:0.6}
+
+.model-card .body{padding:14px 16px 16px;display:flex;align-items:flex-start;justify-content:space-between}
+.model-card .body .info h3{font-size:14px;font-weight:500;color:#0F1419;letter-spacing:-0.005em}
+.model-card .body .info .meta{font-size:11px;color:#5A6373;margin-top:1px;font-weight:400}
+.model-card .body .tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.model-card .body .tags span{font-size:9px;padding:2px 8px;border:1px solid #DEE2EA;color:#5A6373;font-weight:500;letter-spacing:0.03em}
+.model-card .body .tags .ar-tag{border-color:rgba(30,91,214,0.2);color:#1E5BD6}
+
+.model-card .card-edit{width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid #DEE2EA;background:#fff;color:#8C95A4;font-size:12px;cursor:pointer;transition:all .25s;font-family:'IBM Plex Mono',monospace;opacity:0}
+.model-card:hover .card-edit{opacity:1}
+.model-card .card-edit:hover{border-color:#1E5BD6;color:#1E5BD6}
+
+/* Add card */
+.model-card.add{background:transparent;border-style:dashed;border-color:#DEE2EA;cursor:pointer;box-shadow:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px}
+.model-card.add:hover{border-color:#1E5BD6;box-shadow:none}
+.model-card.add .add-icon{width:32px;height:32px;position:relative;margin-bottom:10px;opacity:0.3;transition:opacity .3s}
+.model-card.add:hover .add-icon{opacity:0.6}
+.model-card.add .add-icon::before,.model-card.add .add-icon::after{content:'';position:absolute;background:#8C95A4}
+.model-card.add .add-icon::before{top:50%;left:0;right:0;height:1.5px;transform:translateY(-50%)}
+.model-card.add .add-icon::after{left:50%;top:0;bottom:0;width:1.5px;transform:translateX(-50%)}
+.model-card.add .add-label{font-family:'IBM Plex Mono','Consolas',monospace;font-size:11px;color:#8C95A4;letter-spacing:0.16em;text-transform:uppercase;font-weight:500}
+
+#landing-footer{position:absolute;bottom:0;left:0;right:0;z-index:2;text-align:center;padding:10px 24px;font-family:'IBM Plex Mono','Consolas',monospace;font-size:9px;color:#5A6373;letter-spacing:0.16em;text-transform:uppercase;background:linear-gradient(0deg,#F4F6F9,transparent);opacity:0.5}
+
+/* ====== MODAL ====== */
+#modal-overlay{position:fixed;inset:0;z-index:50;background:rgba(15,20,25,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:24px}
+#modal-overlay.show{display:flex}
+#modal{background:#fff;width:100%;max-width:480px;border:1px solid #DEE2EA;padding:0}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #DEE2EA}
+.modal-title{font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-size:17px;font-weight:600;color:#0F1419;letter-spacing:-0.005em}
+.modal-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #DEE2EA;background:transparent;color:#8C95A4;cursor:pointer;font-size:14px;transition:all .25s;font-family:'IBM Plex Mono',monospace}
+.modal-close:hover{border-color:#B91C1C;color:#B91C1C}
+
+.modal-body{padding:24px}
+.modal-field{margin-bottom:18px}
+.modal-field label{display:block;font-family:'Noto Sans SC','PingFang SC',sans-serif;font-size:13px;font-weight:500;color:#2D3543;margin-bottom:6px}
+.modal-field label .req{color:#1E5BD6;margin-left:2px}
+.modal-field input,.modal-field select{width:100%;background:transparent;border:none;border-bottom:1px solid #DEE2EA;color:#0F1419;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-size:14px;padding:8px 2px;outline:none;transition:border-color 280ms cubic-bezier(.16,1,.3,1)}
+.modal-field input:focus,.modal-field select:focus{border-bottom-color:#1E5BD6}
+.modal-field input::placeholder{color:#C2C8D2}
+.modal-field .hint{font-size:10px;color:#8C95A4;margin-top:4px;letter-spacing:0.02em}
+
+.modal-footer{display:flex;align-items:center;justify-content:space-between;padding:16px 24px 20px;border-top:1px solid #EDF0F4}
+.modal-footer .left{font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:#8C95A4;letter-spacing:0.14em;text-transform:uppercase}
+.modal-footer .actions{display:flex;gap:10px}
+.btn-modal{font-family:'IBM Plex Mono','Consolas',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;font-weight:600;padding:10px 20px;border:1px solid #DEE2EA;background:transparent;color:#2D3543;cursor:pointer;transition:all 280ms cubic-bezier(.16,1,.3,1)}
+.btn-modal:hover{border-color:#0F1419;color:#0F1419}
+.btn-modal.primary{background:#0F1419;color:#FAFBFC;border-color:#0F1419}
+.btn-modal.primary:hover{background:#1E5BD6;border-color:#1E5BD6}
+.btn-modal.danger{color:#B91C1C;border-color:rgba(185,28,28,0.15)}
+.btn-modal.danger:hover{border-color:#B91C1C}
+
+/* ====== VIEWER (Dark) ====== */
+#viewer{position:fixed;inset:0;z-index:10;background:#0A0D12;opacity:0;transition:opacity .45s ease;pointer-events:none}
+#viewer.show{opacity:1;pointer-events:auto}
+model-viewer{width:100%;height:100%;--poster-color:transparent;background:transparent}
+#mv-container{position:absolute;inset:0}
+model-viewer::part(default-progress-bar){background:#1E5BD6!important;height:2px!important}
+model-viewer::part(ar-button){background:rgba(30,91,214,0.1)!important;backdrop-filter:blur(12px)!important;border:1px solid rgba(30,91,214,0.15)!important;border-radius:0!important;color:#fff!important;font-size:13px!important;font-weight:500!important;padding:12px 28px!important;box-shadow:0 8px 40px rgba(0,0,0,0.5)!important;bottom:100px!important;letter-spacing:0.06em!important;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif!important;transition:all .3s!important}
+model-viewer::part(ar-button):hover{background:rgba(30,91,214,0.2)!important;border-color:rgba(30,91,214,0.25)!important}
+
+#v-header{position:fixed;top:0;left:0;right:0;z-index:15;display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:linear-gradient(180deg,rgba(10,13,18,0.85)0%,transparent 100%);pointer-events:none;opacity:0;transition:opacity .6s ease}
+#v-header.show{opacity:1}
+#v-header>*{pointer-events:auto}
+#v-header .v-brand{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,0.2);font-weight:400;letter-spacing:0.04em}
+#v-header .v-brand .dot{width:4px;height:4px;border-radius:50%;background:#1E5BD6}
+#v-header .v-meta{font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:rgba(255,255,255,0.15);letter-spacing:0.12em;text-transform:uppercase}
+
+#back-btn{position:fixed;top:14px;left:16px;z-index:25;display:flex;align-items:center;gap:6px;padding:5px 14px 5px 10px;background:rgba(10,13,18,0.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.2);font-size:11px;cursor:pointer;font-family:'IBM Plex Sans','Noto Sans SC',sans-serif;font-weight:400;letter-spacing:0.04em;opacity:0;transition:opacity .45s ease,background .25s,color .25s;pointer-events:none}
+#back-btn.show{opacity:1;pointer-events:auto}
+#back-btn:hover{background:rgba(10,13,18,0.75);color:rgba(255,255,255,0.4)}
+#back-btn svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+#qr-panel{position:fixed;right:28px;bottom:140px;z-index:15;width:164px;background:rgba(10,13,18,0.65);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.04);padding:18px 16px 14px;text-align:center;opacity:0;transition:opacity .5s ease}
+#qr-panel.show{opacity:1}
+#qr-panel img{width:130px;height:130px;display:block;margin:0 auto 8px}
+#qr-panel .label{font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:0.04em;line-height:1.5;font-weight:400}
+#qr-panel .label .hl{color:rgba(255,255,255,0.5);font-weight:500}
+
+#controls{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:15;display:flex;align-items:center;gap:24px;background:rgba(10,13,18,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.03);padding:6px 20px;opacity:0;transition:opacity .6s ease;pointer-events:none}
+#controls.show{opacity:1}
+#controls span{font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:rgba(255,255,255,0.1);letter-spacing:0.1em;display:flex;align-items:center;gap:6px;text-transform:uppercase}
+#controls .k{display:inline-block;padding:1px 5px;border:1px solid rgba(255,255,255,0.03);color:rgba(255,255,255,0.06);font-size:9px}
+
+#status{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:15;font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:rgba(255,255,255,0.1);letter-spacing:0.16em;text-transform:uppercase;background:rgba(10,13,18,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.02);padding:5px 14px;opacity:0;transition:opacity .4s ease}
+#status.show{opacity:1}
+
+#v-loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0A0D12;transition:opacity .4s ease;pointer-events:none}
+#v-loading.hidden{opacity:0}
+#v-loading .progress-track{width:140px;height:2px;background:rgba(255,255,255,0.04);margin-bottom:14px;position:relative}
+#v-loading .progress-fill{height:100%;background:#1E5BD6;width:0;transition:width .3s ease}
+#v-loading .label{font-family:'IBM Plex Mono','Consolas',monospace;font-size:11px;color:rgba(255,255,255,0.15);letter-spacing:0.16em;text-transform:uppercase}
+#v-loading .pct{font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:rgba(255,255,255,0.06);margin-top:3px;letter-spacing:0.1em}
+#v-loading .model-name{font-size:12px;color:rgba(255,255,255,0.06);margin-top:16px;letter-spacing:0.04em;font-weight:400}
+
+#v-error{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0A0D12}
+#v-error.show{display:flex}
+#v-error .code{font-family:'IBM Plex Mono','Consolas',monospace;font-size:36px;color:rgba(255,255,255,0.05);font-weight:600;margin-bottom:10px;letter-spacing:-0.03em}
+#v-error h3{font-size:14px;font-weight:500;color:rgba(255,255,255,0.15);letter-spacing:0.04em}
+#v-error p{font-size:11px;color:rgba(255,255,255,0.08);margin-top:4px;font-weight:400}
+#v-error .hint{margin-top:14px;font-family:'IBM Plex Mono','Consolas',monospace;font-size:10px;color:rgba(255,255,255,0.05);letter-spacing:0.1em}
+
+#watermark{position:fixed;bottom:76px;left:28px;z-index:12;pointer-events:none;opacity:0;transition:opacity .6s ease}
+#watermark.show{opacity:1}
+#watermark span{font-family:'IBM Plex Mono','Consolas',monospace;font-size:9px;color:rgba(255,255,255,0.04);letter-spacing:0.12em;text-transform:uppercase}
+
+@media(max-width:767px){
+  #header{padding:12px 16px}
+  .brand-title{font-size:14px}
+  .brand-sub{display:none}
+  #hero{padding:24px 16px 4px}
+  #grid-wrap{padding:8px 16px 50px}
+  #grid{grid-template-columns:1fr;max-width:360px;gap:14px}
+  #v-header{padding:10px 16px}
+  #controls{bottom:16px;gap:14px;padding:5px 14px}
+  #controls span{font-size:9px}
+  #controls .k{display:none}
+  #qr-panel{display:none}
+  #status{bottom:72px;font-size:9px}
+  #back-btn{top:10px;left:10px;padding:4px 10px 4px 6px;font-size:10px}
+  #watermark{left:16px;bottom:60px}
+  #modal-overlay{padding:16px}
+  #modal{max-width:100%}
+  .btn-ghost{font-size:9px;padding:5px 10px}
+}
+@media(min-width:768px)and (max-width:1023px){
+  #grid{grid-template-columns:repeat(2,1fr);gap:16px}
+  #qr-panel{width:144px;right:16px;padding:14px 12px}
+  #qr-panel img{width:116px;height:116px}
+}
+</style>
+</head>
+<body>
+
+<!-- ====== LANDING ====== -->
+<div id="landing">
+  <div id="header">
+    <div class="brand">
+      <div class="brand-mark">匠</div>
+      <div class="brand-text">
+        <span class="brand-title">新锐鲁班工匠</span>
+        <span class="brand-sub">Architectural AR Viewer</span>
+      </div>
+    </div>
+    <div id="header-actions">
+      <button class="btn-ghost" id="btn-manage">管理</button>
+    </div>
+  </div>
+
+  <div id="hero">
+    <div class="section-num">01 · Select</div>
+    <h1>建筑模型 · <span class="accent">AR</span> 查看器</h1>
+    <div class="sub">选择项目，扫码在手机中体验增强现实</div>
+    <div class="rule"></div>
+  </div>
+
+  <div id="grid-wrap">
+    <div id="grid"></div>
+  </div>
+
+  <div id="landing-footer">新锐鲁班工匠 · Architectural AR</div>
+</div>
+
+<!-- ====== MANAGE MODAL ====== -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-head">
+      <span class="modal-title">管理模型</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <p style="font-size:12px;color:#5A6373;margin-bottom:18px;font-weight:400">添加或编辑模型信息，数据自动保存在浏览器中。</p>
+      <div id="model-list"></div>
+      <button class="btn-modal" id="btn-add-model" style="width:100%;text-align:center;margin-top:8px">+ 添加模型</button>
+    </div>
+    <div class="modal-footer">
+      <span class="left">数据本地存储</span>
+      <div class="actions">
+        <button class="btn-modal" id="modal-done">完成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== VIEWER ====== -->
+<div id="viewer">
+  <div id="v-header">
+    <div class="v-brand"><span class="dot"></span><span id="v-model-name">建筑模型</span> · AR 查看器</div>
+    <span class="v-meta">Revit Export</span>
+  </div>
+
+  <div id="v-loading">
+    <div class="progress-track"><div class="progress-fill" id="load-bar"></div></div>
+    <div class="label">Loading Model</div>
+    <div class="pct" id="load-pct"></div>
+    <div class="model-name" id="v-loading-name">建筑模型</div>
+  </div>
+
+  <div id="v-error">
+    <div class="code">404</div>
+    <h3>模型文件未找到</h3>
+    <p>请确认文件路径正确</p>
+    <div class="hint">ERR_FILE_NOT_FOUND</div>
+  </div>
+
+  <div id="mv-container">
+    <model-viewer id="mv"
+      ar ar-modes="webxr scene-viewer quick-look" ar-placement="floor" ar-scale="fixed"
+      camera-controls auto-rotate auto-rotate-delay="800" rotation-per-second="24deg"
+      shadow-intensity="0.4" exposure="0.85" loading="eager" reveal="auto"
+      alt="建筑模型 AR 展示"
+    ></model-viewer>
+  </div>
+
+  <div id="qr-panel">
+    <img id="qr-img" alt="QR Code">
+    <div class="label">Scan with your phone<br><span class="hl">View in AR</span></div>
+  </div>
+
+  <div id="controls">
+    <span><span class="k">Drag</span> Rotate</span>
+    <span><span class="k">Scroll</span> Zoom</span>
+    <span><span class="k">Right</span> Pan</span>
+  </div>
+
+  <div id="status">Loading...</div>
+  <div id="watermark"><span>新锐鲁班工匠</span></div>
+
+  <button id="back-btn" aria-label="Back">
+    <svg viewBox="0 0 24 24"><polyline points="15,6 9,12 15,18"/></svg>
+    Back
+  </button>
+</div>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+const STORAGE_KEY = 'webar-models';
+
+const defaultModels = [
+  { id: 'm1',       name: '别墅建筑模型',
+      file: './assets/model.glb',
+      size: '~5.8 MB (Draco)',
+      desc: 'Revit 精细化建模（Draco 压缩）' },
+];
+
+function loadModels() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) { const d = JSON.parse(raw); if (d.length) return d }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(defaultModels));
+}
+
+function saveModels(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+// ====== Render Cards ======
+let models = loadModels();
+let editingId = null;
+
+const cardIcons = [
+  '<polyline points="32,4 4,20 4,44 32,60 60,44 60,20 32,4"/><polyline points="32,4 32,28 60,44"/><polyline points="4,20 32,44 60,20"/><line x1="32" y1="28" x2="32" x2="60"/><line x1="32" y1="60" x2="32" x2="44"/>',
+  '<rect x="8" y="12" width="48" height="40" rx="2"/><rect x="16" y="20" width="14" height="12"/><rect x="34" y="20" width="14" height="20"/><line x1="32" y1="12" x2="32" x2="8"/>',
+];
+
+function renderGrid() {
+  const grid = $('#grid');
+  grid.innerHTML = '';
+
+  models.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.dataset.id = m.id;
+    card.innerHTML = `
+      <div class="visual">
+        <div class="grid-bg"></div>
+        <span class="badge">${m.desc || 'Model'}</span>
+        <svg class="icon" viewBox="0 0 64 64" fill="none" stroke="#0F1419" stroke-width="1">${cardIcons[i % 2]}</svg>
+        <span class="enter">Enter</span>
+      </div>
+      <div class="body">
+        <div class="info">
+          <h3>${m.name}</h3>
+          <div class="meta">${m.file}</div>
+          <div class="tags">
+            <span class="ar-tag">AR</span>
+            ${m.size ? `<span>${m.size}</span>` : ''}
+          </div>
+        </div>
+        <button class="card-edit" data-id="${m.id}" title="编辑">✎</button>
+      </div>`;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-edit')) return;
+      openViewer(m.id);
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openViewer(m.id); }
+    });
+    card.querySelector('.card-edit').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModal(m.id);
+    });
+
+    grid.appendChild(card);
+  });
+
+  // Add card
+  const addCard = document.createElement('div');
+  addCard.className = 'model-card add';
+  addCard.innerHTML = '<div class="add-icon"></div><span class="add-label">Add Model</span>';
+  addCard.addEventListener('click', () => openModal(null));
+  grid.appendChild(addCard);
+}
+
+// ====== Modal ======
+function openModal(modelId) {
+  const m = modelId ? models.find(x => x.id === modelId) : null;
+  editingId = modelId;
+  const overlay = $('#modal-overlay');
+  const body = $('#modal-body');
+  const entries = document.getElementById('model-list');
+
+  // Preserve the add button and model list
+  // Rebuild model entries
+  const listDiv = document.getElementById('model-list');
+
+  if (modelId === null) {
+    // Adding new
+    listDiv.innerHTML = `
+      <div class="modal-field">
+        <label>模型名称 <span class="req">*</span></label>
+        <input id="f-name" placeholder="例如：别墅建筑模型">
+      </div>
+      <div class="modal-field">
+        <label>GLB 文件路径 <span class="req">*</span></label>
+        <input id="f-file" placeholder="./assets/model.glb" value="./assets/">
+        <div class="hint">支持相对路径或绝对路径</div>
+      </div>
+      <div class="modal-field">
+        <label>文件大小</label>
+        <input id="f-size" placeholder="例如：~140 MB">
+      </div>
+      <div class="modal-field">
+        <label>描述</label>
+        <input id="f-desc" placeholder="例如：Revit 精细化建模">
+      </div>`;
+    $('#btn-add-model').style.display = 'none';
+  } else {
+    // Editing existing - show list of models
+    listDiv.innerHTML = models.map(mm => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #EDF0F4">
+        <div>
+          <div style="font-size:14px;font-weight:500;color:#0F1419">${mm.name}</div>
+          <div style="font-size:10px;color:#8C95A4;font-family:'IBM Plex Mono',monospace;margin-top:2px">${mm.file}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-modal edit-item" data-id="${mm.id}" style="padding:5px 10px;font-size:9px">编辑</button>
+          <button class="btn-modal danger delete-item" data-id="${mm.id}" style="padding:5px 10px;font-size:9px">删除</button>
+        </div>
+      </div>
+    `).join('') + (models.length === 0 ? '<p style="color:#8C95A4;font-size:12px">暂无模型，点击下方添加</p>' : '');
+    $('#btn-add-model').style.display = 'block';
+  }
+
+  overlay.classList.add('show');
+}
+
+function closeModal() {
+  $('#modal-overlay').classList.remove('show');
+  editingId = null;
+}
+
+// ====== Viewer ======
+let currentModel = null;
+let loadTimer = null;
+let viewerListeners = [];
+
+function onModelProgress(e) {
+  const pct = Math.round((e.detail?.totalProgress || 0) * 100);
+  $('#status').textContent = `LOADING ${pct}%`;
+  $('#status').classList.add('show');
+  if ($('#load-bar')) $('#load-bar').style.width = `${pct}%`;
+  if ($('#load-pct')) $('#load-pct').textContent = `${pct}%`;
+}
+
+function onModelLoad() {
+  clearTimeout(loadTimer);
+  $('#v-loading').classList.add('hidden');
+  $('#status').textContent = 'READY';
+  setTimeout(() => $('#status').classList.remove('show'), 1000);
+  $('#v-header').classList.add('show');
+  $('#qr-panel').classList.add('show');
+  $('#controls').classList.add('show');
+  $('#watermark').classList.add('show');
+}
+
+function onModelError() {
+  clearTimeout(loadTimer);
+  $('#v-loading').classList.add('hidden');
+  $('#v-error').classList.add('show');
+  $('#v-error .hint').textContent = `ERR: ${currentModel?.file || 'file'} not found or corrupt`;
+}
+
+function openViewer(id) {
+  const m = models.find(x => x.id === id);
+  if (!m) return;
+  currentModel = m;
+
+  // Clean old listeners
+  viewerListeners.forEach(({ev, fn}) => $('#mv').removeEventListener(ev, fn));
+  viewerListeners = [];
+
+  // Reset error state
+  $('#v-error').classList.remove('show');
+  $('#v-loading').classList.remove('hidden');
+
+  // Reset UI
+  $('#landing').classList.add('hide');
+  $('#viewer').classList.add('show');
+  $('#back-btn').classList.add('show');
+  $('#v-model-name').textContent = m.name;
+  $('#v-loading-name').textContent = m.name;
+
+  // QR
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(window.location.href)}`;
+  $('#qr-img').src = qrSrc;
+
+  // Bind listeners
+  const prog = (e) => onModelProgress(e);
+  const load = () => onModelLoad();
+  const err = () => onModelError();
+  viewerListeners = [
+    {ev: 'progress', fn: prog},
+    {ev: 'load', fn: load},
+    {ev: 'error', fn: err},
+  ];
+  viewerListeners.forEach(({ev, fn}) => $('#mv').addEventListener(ev, fn, {once: ev !== 'progress'}));
+
+  // Timeout (180s for 180MB model)
+  loadTimer = setTimeout(() => {
+    if (!$('#v-loading').classList.contains('hidden')) {
+      onModelError();
+    }
+  }, 180000);
+
+  // Start loading
+  $('#mv').src = m.file;
+}
+
+function closeViewer() {
+  clearTimeout(loadTimer);
+  viewerListeners.forEach(({ev, fn}) => $('#mv').removeEventListener(ev, fn));
+  viewerListeners = [];
+  $('#mv').src = '';
+  $('#viewer').classList.remove('show');
+  $('#back-btn').classList.remove('show');
+  $('#landing').classList.remove('hide');
+  $('#v-header').classList.remove('show');
+  $('#qr-panel').classList.remove('show');
+  $('#controls').classList.remove('show');
+  $('#watermark').classList.remove('show');
+  $('#status').classList.remove('show');
+  $('#v-loading').classList.remove('hidden');
+  $('#v-error').classList.remove('show');
+  currentModel = null;
+}
+
+// ====== Event Binding ======
+$('#back-btn').addEventListener('click', closeViewer);
+
+$('#btn-manage').addEventListener('click', () => openModal('list'));
+
+$('#modal-close').addEventListener('click', closeModal);
+$('#modal-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+$('#modal-done').addEventListener('click', closeModal);
+
+$('#btn-add-model').addEventListener('click', () => {
+  // Show add form in modal
+  const listDiv = document.getElementById('model-list');
+  listDiv.innerHTML = `
+    <div class="modal-field">
+      <label>模型名称 <span class="req">*</span></label>
+      <input id="f-name" placeholder="例如：别墅建筑模型">
+    </div>
+    <div class="modal-field">
+      <label>GLB 文件路径 <span class="req">*</span></label>
+      <input id="f-file" placeholder="./assets/model.glb" value="./assets/">
+      <div class="hint">支持相对路径或绝对路径</div>
+    </div>
+    <div class="modal-field">
+      <label>文件大小</label>
+      <input id="f-size" placeholder="例如：~140 MB">
+    </div>
+    <div class="modal-field">
+      <label>描述</label>
+      <input id="f-desc" placeholder="例如：Revit 精细化建模">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn-modal" id="save-new" style="flex:1;text-align:center">保存</button>
+      <button class="btn-modal" id="cancel-new" style="flex:1;text-align:center">取消</button>
+    </div>`;
+  $('#btn-add-model').style.display = 'none';
+
+  $('#save-new').addEventListener('click', () => {
+    const name = $('#f-name').value.trim();
+    const file = $('#f-file').value.trim();
+    const size = $('#f-size').value.trim();
+    const desc = $('#f-desc').value.trim();
+    if (!name || !file) { alert('请填写模型名称和文件路径'); return; }
+    models.push({ id: 'm' + Date.now(), name, file, size, desc });
+    saveModels(models);
+    renderGrid();
+    openModal('list');
+  });
+
+  $('#cancel-new').addEventListener('click', () => openModal('list'));
+});
+
+// Delegate edit/delete in modal (event delegation)
+$('#modal-body').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.edit-item');
+  const delBtn = e.target.closest('.delete-item');
+
+  if (editBtn) {
+    const id = editBtn.dataset.id;
+    const m = models.find(x => x.id === id);
+    if (!m) return;
+    const listDiv = document.getElementById('model-list');
+    listDiv.innerHTML = `
+      <div class="modal-field">
+        <label>模型名称 <span class="req">*</span></label>
+        <input id="f-name" value="${m.name}">
+      </div>
+      <div class="modal-field">
+        <label>GLB 文件路径 <span class="req">*</span></label>
+        <input id="f-file" value="${m.file}">
+      </div>
+      <div class="modal-field">
+        <label>文件大小</label>
+        <input id="f-size" value="${m.size || ''}">
+      </div>
+      <div class="modal-field">
+        <label>描述</label>
+        <input id="f-desc" value="${m.desc || ''}">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn-modal primary save-edit" data-id="${id}" style="flex:1;text-align:center">保存修改</button>
+        <button class="btn-modal cancel-edit" style="flex:1;text-align:center">取消</button>
+      </div>`;
+    $('#btn-add-model').style.display = 'none';
+
+    $('.save-edit').addEventListener('click', () => {
+      const mm = models.find(x => x.id === id);
+      if (!mm) return;
+      mm.name = $('#f-name').value.trim() || mm.name;
+      mm.file = $('#f-file').value.trim() || mm.file;
+      mm.size = $('#f-size').value.trim();
+      mm.desc = $('#f-desc').value.trim();
+      saveModels(models);
+      renderGrid();
+      openModal('list');
+    });
+    $('.cancel-edit').addEventListener('click', () => openModal('list'));
+  }
+
+  if (delBtn) {
+    if (!confirm('确定删除此模型？')) return;
+    models = models.filter(x => x.id !== delBtn.dataset.id);
+    saveModels(models);
+    renderGrid();
+    openModal('list');
+  }
+});
+
+// Init
+renderGrid();
+</script>
+</body>
+</html>
