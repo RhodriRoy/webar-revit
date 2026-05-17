@@ -2,49 +2,53 @@ $port = 8080
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $dir
 
-Write-Host "=== WebAR Revit Viewer - Local Tunnel ===" -ForegroundColor Cyan
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+
+Write-Host "=== WebAR Revit Viewer ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Kill old processes on port
-$old = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-if ($old) {
-  $old.OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
-  Start-Sleep 1
+# Kill old http-server / tunnel on port 8080
+Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
+  Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+}
+Start-Sleep 1
+
+# Kill old serveo SSH tunnels
+Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'serveo' } | ForEach-Object {
+  Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
 }
 
-# Start http-server
-$serverJob = Start-Job -ScriptBlock {
-  param($d, $p)
-  Set-Location $d
-  npx http-server . -p $p --cors -c-1
-} -ArgumentList $dir, $port
+# Start http-server in background
+$logFile = Join-Path $env:TEMP "http-server-log.txt"
+$httpProc = Start-Process -FilePath "npx" -ArgumentList "http-server . -p $port --cors -c-1" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile
+Start-Sleep 3
 
-Start-Sleep 2
+# Verify it's running
+$check = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+if (-not $check) {
+  Write-Host "http-server 启动失败，手动启动:" -ForegroundColor Red
+  Write-Host "npx http-server . -p $port --cors -c-1" -ForegroundColor Yellow
+  exit 1
+}
+Write-Host "OK http-server (port $port)" -ForegroundColor Green
 
-# Start localtunnel, capture output
-$tunnelFile = Join-Path $env:TEMP "localtunnel-url.txt"
+Write-Host "创建隧道中..." -ForegroundColor Yellow
+
+# Start serveo tunnel - uses SSH, no warning page
+$tunnelFile = Join-Path $env:TEMP "serveo-url.txt"
 Remove-Item $tunnelFile -ErrorAction SilentlyContinue
 
-$tunnelJob = Start-Job -ScriptBlock {
-  param($p, $f)
-  npx localtunnel --port $p 2>&1 | ForEach-Object {
-    $_ | Out-File -FilePath $f -Append
-    Write-Host $_
-  }
-} -ArgumentList $port, $tunnelFile
+$tunnelProc = Start-Process -FilePath "ssh" -ArgumentList "-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R 80:localhost:$port serveo.net" -WindowStyle Hidden -PassThru -RedirectStandardOutput $tunnelFile -RedirectStandardError $tunnelFile
 
 # Wait for URL
 $url = $null
-$timeout = 30
-$elapsed = 0
-while ($elapsed -lt $timeout -and -not $url) {
+for ($i = 0; $i -lt 30 -and -not $url; $i++) {
   Start-Sleep 1
-  $elapsed++
   if (Test-Path $tunnelFile) {
-    $content = Get-Content $tunnelFile
+    $content = Get-Content $tunnelFile -ErrorAction SilentlyContinue
     foreach ($line in $content) {
-      if ($line -match 'your url is:\s*(https?://\S+)') {
-        $url = $matches[1]
+      if ($line -match 'https://\S+\.serveo\.net') {
+        $url = $matches[0]
         break
       }
     }
@@ -53,19 +57,18 @@ while ($elapsed -lt $timeout -and -not $url) {
 
 Write-Host ""
 if ($url) {
-  Write-Host "=== 部署成功 ===" -ForegroundColor Green
-  Write-Host "手机访问: " -NoNewline; Write-Host $url -ForegroundColor Yellow
-  Write-Host "二维码已嵌入页面，扫码即可" -ForegroundColor Green
-  Write-Host "按 Ctrl+C 退出隧道" -ForegroundColor Gray
+  Write-Host "===== 部署成功 =====" -ForegroundColor Green
+  Write-Host "手机访问: $url" -ForegroundColor Yellow
+  Write-Host "无警告页，手机直接打开" -ForegroundColor Green
+  Write-Host "按任意键退出" -ForegroundColor Gray
+  Start-Process $url
+  $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 } else {
-  Write-Host "=== 隧道启动失败 ===" -ForegroundColor Red
-  Write-Host "请手动运行: npx localtunnel --port $port" -ForegroundColor Yellow
+  Write-Host "Serveo 隧道失败，试试 localtunnel:" -ForegroundColor Red
+  Write-Host "npx localtunnel --port $port" -ForegroundColor Yellow
+  $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
-# Keep script alive
-while ($tunnelJob.State -eq 'Running') { Start-Sleep 2 }
-
 # Cleanup
-Stop-Job $serverJob -ErrorAction SilentlyContinue
-Remove-Job $serverJob -ErrorAction SilentlyContinue
-Remove-Job $tunnelJob -ErrorAction SilentlyContinue
+Stop-Process -Id $httpProc.Id -Force -ErrorAction SilentlyContinue
+Stop-Process -Id $tunnelProc.Id -Force -ErrorAction SilentlyContinue
